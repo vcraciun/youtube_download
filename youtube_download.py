@@ -3,6 +3,9 @@ from pytube import Playlist
 from tkinter import *
 from tkinter import ttk
 import threading
+import subprocess
+import os
+import time
 
 max_file_size = 0
 
@@ -26,21 +29,23 @@ def single_add():
     mm = str((timp%3600)//60)
     ss = str(timp%60)
     if len(youtubeObject.title) < 90:
-        titlu = f"{hh:02}:{mm:02}:{ss:02} --> {youtubeObject.title}"        
+        titlu = hh+':'+mm+':'+ss+' --> '+youtubeObject.title
     else:
-        titlu = f"{hh:02}:{mm:02}:{ss:02} --> {youtubeObject.title[:90] + '...'}"        
+        titlu = hh+':'+mm+':'+ss+' --> '+youtubeObject.title[:90]+'...'
     lst.insert(1, titlu)
-    if fis_type == 1:        
-        stream = streams.get_highest_resolution()        
-    else:        
-        streams = youtubeObject.streams.filter(only_audio=True)
-        stream = streams.first()
-    max_file_size = stream.filesize 
-    
+    stream = streams.get_highest_resolution()        
+    max_file_size = stream.filesize  
     try:
-        stream.download()
+        stream.download()        
     except:
         pass
+    filepath = stream.default_filename   
+    if fis_type == 2:
+        pre, ext = os.path.splitext(filepath)
+        output = pre + '.mp3'
+        subprocess.run(["ffmpeg.exe", "-i", filepath, output], shell=True)
+        os.remove(filepath)
+        pb['value'] = 0
 
 def playlist_add():
     global all_playlists    
@@ -52,9 +57,9 @@ def playlist_add():
         mm = str((timp%3600)//60)
         ss = str(timp%60)
         if len(video.title) < 90:
-            titlu = f"{hh:02}:{mm:02}:{ss:02} --> {video.title}"        
+            titlu = hh+':'+mm+':'+ss+' --> '+video.title
         else:
-            titlu = f"{hh:02}:{mm:02}:{ss:02} --> {video.title[:90] + '...'}"
+            titlu = hh+':'+mm+':'+ss+' --> '+video.title[:90]+'...'
         lst.insert(i, titlu)
 
     i=1
@@ -75,6 +80,30 @@ def p_add_t():
 
 def v_add_t():
     threading.Thread(target=single_add).start()
+    
+def display_popup_1(event):
+    menu_1.post(event.x_root, event.y_root)
+
+def display_popup_2(event):
+    menu_2.post(event.x_root, event.y_root)
+    
+def menu_1_copy():
+    url_single.event_generate("<<Copy>>")
+
+def menu_1_cut():
+    url_single.event_generate("<<Cut>>")
+
+def menu_1_paste():
+    url_single.event_generate("<<Paste>>")
+
+def menu_2_copy():
+    url_playlist.event_generate("<<Copy>>")
+
+def menu_2_cut():
+    url_playlist.event_generate("<<Cut>>")
+
+def menu_2_paste():
+    url_playlist.event_generate("<<Paste>>")
 
 window = Tk()
 window.geometry('640x500')
@@ -114,5 +143,18 @@ lst.grid(column=0, row=4, columnspan = 7)
 
 pb = ttk.Progressbar(window, orient = 'horizontal', mode = 'determinate', length=600)
 pb.grid(column=0, row=5, columnspan=7)
+
+menu_1 = Menu(tearoff=False)
+menu_2 = Menu(tearoff=False)
+menu_1.add_command(label="Copy", command=menu_1_copy)
+menu_1.add_command(label="Cut", command=menu_1_cut)
+menu_1.add_separator()
+menu_1.add_command(label="Paste", command=menu_1_paste)
+menu_2.add_command(label="Copy", command=menu_2_copy)
+menu_2.add_command(label="Cut", command=menu_2_cut)
+menu_2.add_separator()
+menu_2.add_command(label="Paste", command=menu_2_paste)
+url_single.bind('<Button-3>', display_popup_1)
+url_playlist.bind('<Button-3>', display_popup_2)
 
 window.mainloop()
