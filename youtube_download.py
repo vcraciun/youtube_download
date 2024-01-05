@@ -30,22 +30,19 @@ def RemoveSpecialChars(text):
     text = text.replace('\u00e2', 'a')    
     return text
 
-def ConversieAudio(i, chunk, x, r):    
+def ConversieAudio(param):    
+    i, chunk, x = param
+    r = sr.Recognizer()
     with sr.AudioFile(chunk) as source:
         audio_listened = r.record(source)
         try:
             text = r.recognize_google(audio_listened, language = "ro-RO")                
-        except:
-            #pb['value'] += 100 / len(all_chunks)
-            x[i] = ""
+        except:            
+            x[i] = " "
         else:
             text = RemoveSpecialChars(text)                        
-            #f.write(text)
-            #pb['value'] += 100 / len(all_chunks)
             x[i] = text
-        #pb_val = int(pb['value'] * 100) / 100
-        #statusvar.set(f"Recunoastere TEXT: [{i}/{len(all_chunks)}] : {pb_val}%")
-    exit()
+    return
 
 class YouTubeDownloader:
     def __init__(self):
@@ -66,6 +63,19 @@ class YouTubeDownloader:
         self.window.grid_rowconfigure(5, weight=1)
 
         self.AddComponents()
+
+    def update_progress(self, x, size):                
+        while True:
+            total = 0        
+            for el in x:
+                if len(el) > 0:
+                    total += 1
+            self.pb['value'] = total * (100 / size)
+            pb_val = int(self.pb['value'] * 100) / 100
+            self.statusvar.set(f"Recunoastere TEXT: [{total}/{size}] : {pb_val}%")
+            if total == size:
+                break
+            time.sleep(0.1)
 
     def AddComponents(self):
         Label(self.window, text='Url Video: ').grid(column=0, row=0)
@@ -117,20 +127,10 @@ class YouTubeDownloader:
         if self.max_file_size == 0:
             self.pb['value'] = 100
         else:
-            percentCount = int((100 - (100*(bytes_remaining/max_file_size))) * 100) / 100
-            self.pb['value'] = percentCount
+            percentCount = int((100 - (100*(bytes_remaining/self.max_file_size))) * 100) / 100
+            self.pb['value'] = percentCount  
 
-    #ffmpeg -i pentru.mp3 -acodec pcm_s16le -ac 1 -ar 16000 output.wav
-    def single_add(self):
-        global all_playlists
-        global max_file_size
-        fis_type = self.file_type.get()
-        url = self.url_single.get()
-        if len(url) == 0:
-            self.statusvar.set("Eroare: Lipseste URL catre video!")
-            return
-        self.statusvar.set('Pregatesc video: ... ')
-        youtubeObject = YouTube(url)        
+    def DownloadSingleYouTubeObject(self, youtubeObject, fis_type):
         youtubeObject.register_on_progress_callback(self.show_progress_bar)
         streams = youtubeObject.streams
         timp = youtubeObject.length
@@ -149,7 +149,7 @@ class YouTubeDownloader:
             item = "[TXT] : [" + titlu + "]"
         self.lst.insert(self.lst.size(), item)
         stream = streams.get_highest_resolution()        
-        max_file_size = stream.filesize  
+        self.max_file_size = stream.filesize  
         self.statusvar.set('Pregatesc video: ... [GATA]')
         start = time.time()
         try:
@@ -191,71 +191,60 @@ class YouTubeDownloader:
             sound = AudioSegment.from_wav(output_wav)
             chunks = split_on_silence(sound, min_silence_len=700, silence_thresh=sound.dBFS-14, keep_silence=700)        
             self.statusvar.set('Pregatesc fisierul audio pentru recunoastere TEXT ... [GATA]')
-            for i, audio_chunk in enumerate(chunks, start=0):
+            for i, audio_chunk in enumerate(chunks):
                 chunk_filename = os.path.join(folder_name, f"chunk{i}.wav")
                 audio_chunk.export(chunk_filename, format="wav")
                 all_chunks += [chunk_filename]                
                 self.pb['value'] += 100 / len(chunks)
                 self.pb['value'] = int(self.pb['value'] * 100) / 100
                 self.statusvar.set(f"Sparg fisierul mare in bucati mai mici: [{i}/{len(chunks)}] : {self.pb['value']}%")
-            whole_text = ""
-            self.pb['value'] = 0
-            r = sr.Recognizer()
+            print(len(chunks), len(all_chunks))
+            time.sleep(10)
+            self.pb['value'] = 0            
             with open(output_txt, 'w') as f:
                 procs = []            
                 x = multiprocessing.Manager().list([[]]*len(chunks))
-                for i, chunk in enumerate(all_chunks):
-                    p = multiprocessing.Process(target = ConversieAudio, args=(i, chunk, x, r, ))
-                    p.start()
-                    procs += [p]
-                for p in procs:
-                    p.join()
+                params = [(i, all_chunks[i], x) for i in range(len(all_chunks))]                
+                threading.Thread(target=self.update_progress, args=(x, len(chunks), )).start()
+                with multiprocessing.Pool() as p:
+                    p.map(ConversieAudio, params)
                 for line in x:
                     f.write(line)
+
             os.remove(output_wav)
             for filename in os.listdir('audio-chunks'):
                 if os.path.isfile(os.path.join('audio-chunks', filename)):
                     os.remove(os.path.join('audio-chunks', filename))   
-            os.rmdir('audio-chunks')
-        self.pb['value'] = 0
+            os.rmdir('audio-chunks')        
         stop = time.time()
         timp_total = int(stop-start)
         self.statusvar.set(f"Gata! Conversia a durat {timp_total//60} minute si {timp_total%60} secunde")
+        self.pb['value'] = 0
+        self.window.update()
+        self.window.update_idletasks()        
+
+    def single_add(self):
+        fis_type = self.file_type.get()
+        url = self.url_single.get()
+        if len(url) == 0:
+            self.statusvar.set("Eroare: Lipseste URL catre video!")
+            return
+        self.statusvar.set('Pregatesc video: ... ')
+        youtubeObject = YouTube(url)  
+        try:      
+            self.DownloadSingleYouTubeObject(youtubeObject, fis_type)
+        except Exception as error:
+            self.statusvar.set(f"Eroare: [{error}]")
 
     def playlist_add(self):
         fis_type = self.file_type.get()        
         playlist = Playlist(self.url_playlist.get())     
         i = 0   
-        for video in playlist.videos:                    
-            timp = video.length
-            hh = str(timp//3600)
-            mm = str((timp%3600)//60)
-            ss = str(timp%60)
-            if len(video.title) < 90:
-                titlu = hh+':'+mm+':'+ss+' --> '+video.title
-            else:
-                titlu = hh+':'+mm+':'+ss+' --> '+video.title[:90]+'...'
-
-            if fis_type == 1:
-                item = f"[MP4] : [{titlu}]"
-            elif fis_type == 2:
-                item = f"[MP3] : [{titlu}]"
-            elif fis_type == 3:
-                item = f"[TXT] : [{titlu}]"
-            self.lst.insert(self.lst.size(), item)
-            i += 1
-
-        i=1    
-        self.pb['value'] = 0    
-        for video in playlist.videos:                 
-            if fis_type == 1:
-                stream = video.streams.filter(type='video', progressive=True, file_extension='mp4').order_by('resolution').desc().first()            
-            else:
-                stream = video.streams.filter(only_audio=True).first()
-            stream.download('.')     
-            self.pb['value'] += 100/len(playlist.videos)
-            i += 1     
-        self.pb['value'] = 100           
+        for video in playlist.videos:        
+            try:
+                self.DownloadSingleYouTubeObject(video, fis_type)         
+            except Exception as error:
+                self.statusvar.set(f"Eroare: [{error}]")
 
     def p_add_t(self):
         threading.Thread(target=self.playlist_add).start()
