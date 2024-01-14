@@ -68,6 +68,7 @@ class YouTubeDownloader:
         self.window.grid_rowconfigure(6, weight=1)
         self.window.grid_rowconfigure(7, weight=1)
         self.window.grid_rowconfigure(8, weight=1)
+        self.window.grid_rowconfigure(9, weight=1)
 
         self.AddComponents()
 
@@ -105,26 +106,31 @@ class YouTubeDownloader:
         self.audio_file = Entry(self.window, width = 80)
         self.audio_file.grid(column=1, row=2)
         Button(self.window, text='Cauta', command=self.f_add_t).grid(column=2, row=2)
+        
+        Label(self.window, text='Folder audio: ').grid(column=0, row=3)
+        self.audio_folder = Entry(self.window, width = 80)
+        self.audio_folder.grid(column=1, row=3)
+        Button(self.window, text='Transforma', command=self.d_add_t).grid(column=2, row=3)        
 
         self.file_type = IntVar()
         self.file_type.set(1)
-        Radiobutton(self.window, text="MP4", variable=self.file_type, value=1).grid(column=0, row=3, columnspan=1)
-        Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=3, columnspan=1)
-        Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=3, columnspan=1)
+        Radiobutton(self.window, text="MP4", variable=self.file_type, value=1).grid(column=0, row=4, columnspan=1)
+        Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=4, columnspan=1)
+        Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=4, columnspan=1)
 
-        Label(self.window, text='List de fisiere:').grid(column=0, row=4)
+        Label(self.window, text='List de fisiere:').grid(column=0, row=5)
 
         self.scrollbar = Scrollbar(self.window, orient="vertical")
-        self.scrollbar.grid( column=6, row = 5, sticky=NS )
+        self.scrollbar.grid( column=6, row = 6, sticky=NS )
 
         self.lst = Listbox(self.window, width = 100, height=20, yscrollcommand=self.scrollbar.set)
-        self.lst.grid(column=0, row=5, columnspan = 7)
+        self.lst.grid(column=0, row=6, columnspan = 7)
 
         self.pb = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb.grid(column=0, row=6, columnspan=7)
+        self.pb.grid(column=0, row=7, columnspan=7)
 
         self.pb2 = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb2.grid(column=0, row=7, columnspan=7)
+        self.pb2.grid(column=0, row=8, columnspan=7)
 
         self.pb['value'] = 0
         self.pb2['value'] = 0
@@ -132,20 +138,38 @@ class YouTubeDownloader:
         self.statusvar = StringVar()
         self.statusvar.set("Pregatit")
         self.sbar = Label(self.window, textvariable=self.statusvar, relief=FLAT, anchor="w", justify="left", width=85)
-        self.sbar.grid(column=0, row=8, columnspan=7)
+        self.sbar.grid(column=0, row=9, columnspan=7)
 
         self.menu_1 = Menu(tearoff=False)
         self.menu_2 = Menu(tearoff=False)
-        self.menu_1.add_command(label="Copie", command=self.menu_1_copy)
-        self.menu_1.add_command(label="Taie", command=self.menu_1_cut)
+        self.menu_3 = Menu(tearoff=False)
+        self.menu_4 = Menu(tearoff=False)
+        
+        self.menu_1.add_command(label="Copie", command=self.menu_copy_1)
+        self.menu_1.add_command(label="Taie", command=self.menu_cut_1)
         self.menu_1.add_separator()
-        self.menu_1.add_command(label="Lipeste", command=self.menu_1_paste)
-        self.menu_2.add_command(label="Copie", command=self.menu_2_copy)
-        self.menu_2.add_command(label="Taie", command=self.menu_2_cut)
+        self.menu_1.add_command(label="Lipeste", command=self.menu_paste_1)
+        
+        self.menu_2.add_command(label="Copie", command=self.menu_copy_2)
+        self.menu_2.add_command(label="Taie", command=self.menu_cut_2)
         self.menu_2.add_separator()
-        self.menu_2.add_command(label="Lipeste", command=self.menu_2_paste)
+        self.menu_2.add_command(label="Lipeste", command=self.menu_paste_2)
+
+        self.menu_3.add_command(label="Copie", command=self.menu_copy_3)
+        self.menu_3.add_command(label="Taie", command=self.menu_cut_3)
+        self.menu_3.add_separator()
+        self.menu_3.add_command(label="Lipeste", command=self.menu_paste_3)        
+
+        self.menu_4.add_command(label="Copie", command=self.menu_copy_4)
+        self.menu_4.add_command(label="Taie", command=self.menu_cut_4)
+        self.menu_4.add_separator()
+        self.menu_4.add_command(label="Lipeste", command=self.menu_paste_4)        
+        
         self.url_single.bind('<Button-3>', self.display_popup_1)
-        self.url_playlist.bind('<Button-3>', self.display_popup_2)        
+        self.url_playlist.bind('<Button-3>', self.display_popup_2)  
+        self.audio_file.bind('<Button-3>', self.display_popup_3)  
+        self.audio_folder.bind('<Button-3>', self.display_popup_4)  
+        
 
     def show_progress_bar(self, stream=None, chunk=None, bytes_remaining=None):
         if self.max_file_size == 0:
@@ -338,19 +362,15 @@ class YouTubeDownloader:
         else:
             self.ScrieStatistica(solutie, url)
         
-    def file_add(self):
-        start = time.time()
-        fname = filedialog.askopenfilename(initialdir = "./", title = "Selectati fisier Audio", filetypes = (("Fisiere MP3", "*.mp3*"), ("Fisiere WAV", "*.wav"), ("Toate fisierele", "*.*")))
-        self.audio_file.delete(0, END)
-        self.audio_file.insert(0, fname)
+    def mp3_process(self, fname):        
         fis_type = self.file_type.get()
         if fis_type != 3:
             self.statusvar.set(f"EROARE: TRebuie sa bifati optiunea TXT pentru conversie!")
-            return
-        fname = self.audio_file.get()        
+            return        
         if len(fname) == 0:
             self.statusvar.set("EROARE: Numele de fisier lipseste!")
             return        
+        start = time.time()
         self.lst.insert(self.lst.size(), fname)
         self.TransformMP3ToText(fname, "")    
         self.EraseChunksFolder('audio-chunks')
@@ -359,7 +379,20 @@ class YouTubeDownloader:
         self.statusvar.set(f"Gata! Conversia a durat {timp_total//60} minute si {timp_total%60} secunde")
         self.pb['value'] = 0
         self.window.update()
-        self.window.update_idletasks()        
+        self.window.update_idletasks() 
+        
+        
+    def file_add(self):        
+        fname = filedialog.askopenfilename(initialdir = "./", title = "Selectati fisier Audio", filetypes = (("Fisiere MP3", "*.mp3*"), ("Fisiere WAV", "*.wav"), ("Toate fisierele", "*.*")))
+        self.audio_file.delete(0, END)
+        self.audio_file.insert(0, fname)
+        self.mp3_process(fname)
+
+    def folder_add(self):
+        folder = self.audio_folder.get()
+        file_list = [f for f in os.listdir(folder) if f.endswith('.mp3')]
+        for mp3 in file_list:
+            self.mp3_process(f"{folder}\\{mp3}")
 
     def single_add(self):
         fis_type = self.file_type.get()
@@ -392,30 +425,43 @@ class YouTubeDownloader:
 
     def f_add_t(self):
         threading.Thread(target=self.file_add).start()
+        
+    def d_add_t(self):
+        threading.Thread(target=self.folder_add).start()
       
     def display_popup_1(self, event):
         self.menu_1.post(event.x_root, event.y_root)
-
     def display_popup_2(self, event):
         self.menu_2.post(event.x_root, event.y_root)
+    def display_popup_3(self, event):
+        self.menu_3.post(event.x_root, event.y_root)
+    def display_popup_4(self, event):
+        self.menu_4.post(event.x_root, event.y_root)        
         
-    def menu_1_copy(self):
+    def menu_copy_1(self):
         self.url_single.event_generate("<<Copy>>")
-
-    def menu_1_cut(self):
+    def menu_cut_1(self):
         self.url_single.event_generate("<<Cut>>")
-
-    def menu_1_paste(self):
+    def menu_paste_1(self):
         self.url_single.event_generate("<<Paste>>")
-
-    def menu_2_copy(self):
-        self.url_playlist.event_generate("<<Copy>>")
-
-    def menu_2_cut(self):
-        self.url_playlist.event_generate("<<Cut>>")
-
-    def menu_2_paste(self):
-        self.url_playlist.event_generate("<<Paste>>")
+    def menu_copy_2(self):
+        self.url_playlis.event_generate("<<Copy>>")
+    def menu_cut_2(self):
+        self.url_playlis.event_generate("<<Cut>>")
+    def menu_paste_2(self):
+        self.url_playlis.event_generate("<<Paste>>")
+    def menu_copy_3(self):
+        self.audio_file.event_generate("<<Copy>>")
+    def menu_cut_3(self):
+        self.audio_file.event_generate("<<Cut>>")
+    def menu_paste_3(self):
+        self.audio_file.event_generate("<<Paste>>")
+    def menu_copy_4(self):
+        self.audio_folder.event_generate("<<Copy>>")
+    def menu_cut_4(self):
+        self.audio_folder.event_generate("<<Cut>>")
+    def menu_paste_4(self):
+        self.audio_folder.event_generate("<<Paste>>")        
 
     def Run(self):
         self.window.mainloop()
