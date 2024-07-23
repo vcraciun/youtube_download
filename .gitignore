@@ -161,3 +161,5 @@ cython_debug/
 audio-chunks
 *.mp3
 *.exe
+*.mp4
+*.txt

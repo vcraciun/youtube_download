@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import json
+import logging
 
 def RemoveSpecialChars(text):
     text = text.capitalize() + ".\n"
@@ -48,6 +49,7 @@ def ConversieAudio(param):
 
 class YouTubeDownloader:
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self.max_file_size = 0
         self.window = Tk()
         self.window.geometry('640x600')
@@ -213,16 +215,11 @@ class YouTubeDownloader:
         self.statusvar.set(f"Sparg fisierul mare in bucati mai mici: [{len(chunks)}/{len(chunks)}] : {100}%")
         return all_chunks
     
-    def ConvertChunksToText(self, chunks, all_chunks, i, n, words, best):
+    def ConvertChunksToText(self, chunks, all_chunks):
         procs = []        
         self.pb['value'] = 0            
         x = multiprocessing.Manager().list([[]]*len(chunks))
         params = [(i, all_chunks[i], x) for i in range(len(all_chunks))]                
-        #threading.Thread(target=self.update_progress, args=(x, len(chunks), )).start()
-        if i == 0:
-            self.statusvar.set(f'Conversie AUDIO la TEXT: Incercam varianta [{i}/{n}]')
-        else:
-            self.statusvar.set(f'Conversie AUDIO la TEXT: Incercam varianta [{i}/{n}], Varianta {i-1} -> [{words}] cuvinte, Best: ({best[0]}:{best[1]})')
         with multiprocessing.Pool() as p:
             p.map(ConversieAudio, params)
         return x
@@ -308,30 +305,50 @@ class YouTubeDownloader:
             words += len(item.split(' '))    
         return words
     
+    def ComputeIteration(self, i, sound):
+        tresh = i * (-1)
+        self.ClearChunksFolder('audio-chunks')
+        chunks = split_on_silence(sound, min_silence_len=1000, silence_thresh=tresh, keep_silence=700, seek_step=100)        
+        all_chunks = self.SplitToChunks(chunks, folder_name="audio-chunks")             
+        x = self.ConvertChunksToText(chunks, all_chunks)
+        self.statusvar.set(f'Conversie AUDIO la TEXT: S-a terminat varianta [{i}] -> {len(x)} cuvinte')
+        if len(x) == 0:
+            return []
+        words = self.CountWords(x)
+        self.best_config[words] = (i, x)
+        self.logger.info(f"Cuurent iteration: ({i}:{words})")
+        return x
+    
+    def BinarySearch(self, min, max, lmin, lmax, sound):
+        cuvinte3 = self.ComputeIteration((min+max)//2, sound)
+        l3 = self.CountWords(cuvinte3)
+        if lmax < l3 and l3 > lmin:
+            if max == min + 2:
+                return cuvinte3
+            else:
+                return self.BinarySearch((min+max)//2, max, l3, lmax, sound)
+        else:
+            if lmax > l3:
+                self.logger.info(f'Eroare --> trebuie extins range-ul: {min}:{lmin}, {(min+max)//2}:{l3}, {max}:{lmax}')
+            else:
+                if l3 > lmin:
+                    self.logger.info(f'Eroare --> check: {min}:{lmin}, {(min+max)//2}:{l3}, {max}:{lmax}')
+                else:
+                    if max == min + 2:
+                        return cuvinte3
+                    else:
+                        return self.BinarySearch(min, (min+max)//2, lmin, l3, sound)
+        return []
+    
     def FindSolutions(self, sound):
         self.statusvar.set('Caut solutia cea mai buna de conversie, s-ar putea sa dureze cateva minute ... ')
-        best_config = {}
-        self.pb['value'] = 0
-        pb_increment = 100 / len(list(range(self.min_tresh,self.max_tresh)))
-        words = 0
-        best = (0, 0)
-        max = 0
-        self.pb2['value'] = 0
-        for i in range(self.min_tresh,self.max_tresh):
-            tresh = i * (-1)
-            self.ClearChunksFolder('audio-chunks')
-            chunks = split_on_silence(sound, min_silence_len=1000, silence_thresh=tresh, keep_silence=700, seek_step=100)        
-            all_chunks = self.SplitToChunks(chunks, folder_name="audio-chunks")             
-            x = self.ConvertChunksToText(chunks, all_chunks, i-15, len(list(range(self.min_tresh,self.max_tresh))), words, best)
-            if len(x) == 0:
-                continue    
-            words = self.CountWords(x)
-            best_config[words] = (i, x)    
-            self.pb2['value'] += pb_increment
-            solutii_sortat = dict(reversed(sorted(best_config.items())))
-            if words > max:
-                best = (i, words)
-                max = words
+        self.pb['value'] = 0      
+        self.pb2['value'] = 0              
+        self.best_config={}
+        cuvinte_1 = self.ComputeIteration(self.min_tresh, sound)        
+        cuvinte_n = self.ComputeIteration(self.max_tresh, sound)
+        self.BinarySearch(self.min_tresh, self.max_tresh, self.CountWords(cuvinte_1), self.CountWords(cuvinte_n), sound)
+        solutii_sortat = dict(reversed(sorted(self.best_config.items())))
         return solutii_sortat
     
     def ScrieTextRezultat(self, solutie, output_txt):
@@ -467,6 +484,7 @@ class YouTubeDownloader:
         self.window.mainloop()
 
 def main():
+    logging.basicConfig(filename='Youtube-Downloader.log', level=logging.INFO)    
     downloader = YouTubeDownloader()    
     downloader.Run()
 
