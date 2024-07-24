@@ -33,12 +33,14 @@ def RemoveSpecialChars(text):
     return text
 
 def ConversieAudio(param):    
-    i, chunk, x = param
+    i, chunk, x, lang = param
     r = sr.Recognizer()
     with sr.AudioFile(chunk) as source:
         audio_listened = r.record(source)
         try:
-            text = r.recognize_google(audio_listened, language = "ro-RO")                
+            #text = r.recognize_google(audio_listened, language = "ro-RO")                
+            #text = r.recognize_google(audio_listened, language = "en-EN")
+            text = r.recognize_google(audio_listened, language = lang)
         except:            
             x[i] = ""
         else:
@@ -50,11 +52,11 @@ class YouTubeDownloader:
     def __init__(self):
         self.max_file_size = 0
         self.window = Tk()
-        self.window.geometry('640x600')
+        self.window.geometry('640x640')
         self.window.title('Python Youtube Downloader')
         self.window.resizable(False,False)
         self.min_tresh = 15
-        self.max_tresh = 50
+        self.max_tresh = 60
 
         self.window.grid_columnconfigure(0, weight=1)
         self.window.grid_columnconfigure(1, weight=5)
@@ -69,6 +71,7 @@ class YouTubeDownloader:
         self.window.grid_rowconfigure(7, weight=1)
         self.window.grid_rowconfigure(8, weight=1)
         self.window.grid_rowconfigure(9, weight=1)
+        self.window.grid_rowconfigure(10, weight=1)
 
         self.AddComponents()
 
@@ -118,19 +121,24 @@ class YouTubeDownloader:
         Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=4, columnspan=1)
         Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=4, columnspan=1)
 
-        Label(self.window, text='List de fisiere:').grid(column=0, row=5)
+        self.language = IntVar()
+        self.language.set(1)
+        Radiobutton(self.window, text="RO", variable=self.language, value=1).grid(column=0, row=5, columnspan=1)
+        Radiobutton(self.window, text="EN", variable=self.language, value=2).grid(column=2, row=5, columnspan=1)
+
+        Label(self.window, text='List de fisiere:').grid(column=0, row=6)
 
         self.scrollbar = Scrollbar(self.window, orient="vertical")
-        self.scrollbar.grid( column=6, row = 6, sticky=NS )
+        self.scrollbar.grid( column=6, row = 7, sticky=NS )
 
         self.lst = Listbox(self.window, width = 100, height=20, yscrollcommand=self.scrollbar.set)
-        self.lst.grid(column=0, row=6, columnspan = 7)
+        self.lst.grid(column=0, row=7, columnspan = 8)
 
         self.pb = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb.grid(column=0, row=7, columnspan=7)
+        self.pb.grid(column=0, row=8, columnspan=8)
 
         self.pb2 = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb2.grid(column=0, row=8, columnspan=7)
+        self.pb2.grid(column=0, row=9, columnspan=8)
 
         self.pb['value'] = 0
         self.pb2['value'] = 0
@@ -138,7 +146,7 @@ class YouTubeDownloader:
         self.statusvar = StringVar()
         self.statusvar.set("Pregatit")
         self.sbar = Label(self.window, textvariable=self.statusvar, relief=FLAT, anchor="w", justify="left", width=85)
-        self.sbar.grid(column=0, row=9, columnspan=7)
+        self.sbar.grid(column=0, row=10, columnspan=7)
 
         self.menu_1 = Menu(tearoff=False)
         self.menu_2 = Menu(tearoff=False)
@@ -217,7 +225,8 @@ class YouTubeDownloader:
         procs = []        
         self.pb['value'] = 0            
         x = multiprocessing.Manager().list([[]]*len(chunks))
-        params = [(i, all_chunks[i], x) for i in range(len(all_chunks))]                
+        lang = "ro-RO" if self.language.get() == 1 else "en-EN"
+        params = [(i, all_chunks[i], x, lang) for i in range(len(all_chunks))]                
         #threading.Thread(target=self.update_progress, args=(x, len(chunks), )).start()
         if i == 0:
             self.statusvar.set(f'Conversie AUDIO la TEXT: Incercam varianta [{i}/{n}]')
@@ -315,8 +324,10 @@ class YouTubeDownloader:
         pb_increment = 100 / len(list(range(self.min_tresh,self.max_tresh)))
         words = 0
         best = (0, 0)
-        max = 0
+        maxim = 0
         self.pb2['value'] = 0
+        min_set = 0
+        first_entry = False
         for i in range(self.min_tresh,self.max_tresh):
             tresh = i * (-1)
             self.ClearChunksFolder('audio-chunks')
@@ -329,9 +340,21 @@ class YouTubeDownloader:
             best_config[words] = (i, x)    
             self.pb2['value'] += pb_increment
             solutii_sortat = dict(reversed(sorted(best_config.items())))
-            if words > max:
+            if words >= maxim:
+                first_entry = False
                 best = (i, words)
-                max = words
+                maxim = words
+            else:
+                if not first_entry:
+                    first_entry = True
+                    min_set = 1
+                    last_min = words
+                else:
+                    if words < last_min:
+                        last_min = words
+                        min_set += 1                    
+                        if min_set == 3:
+                            break
         return solutii_sortat
     
     def ScrieTextRezultat(self, solutie, output_txt):
