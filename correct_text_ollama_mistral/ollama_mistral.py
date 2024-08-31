@@ -11,7 +11,7 @@ OLLAMA_CONFIG = {
 }
 
 PROMPT_TEMPLATE1 = Template(
-    """Fix all typos, casing and punctuation in this text:
+    """Fix all typos, casing and punctuation in this romanian text:
 
 $text
 
@@ -20,7 +20,7 @@ Return only the corrected text, don't include a preamble.
 )
 
 PROMPT_TEMPLATE2 = Template(
-    """Fix all typos, casing, punctuation and also reformulate and correct the grammar errors in this text:
+    """Fix all typos, casing, punctuation and also reformulate and correct the grammar errors in this romanian text:
 
 $text
 
@@ -35,7 +35,7 @@ def fix_text(text):
         OLLAMA_ENDPOINT,
         json={"prompt": prompt, **OLLAMA_CONFIG},
         headers={"Content-Type": "application/json"},
-        timeout=300,
+        timeout=3000,
     )
     if response.status_code != 200:
         print("Error", response.status_code)
@@ -43,6 +43,7 @@ def fix_text(text):
     return response.json()["response"].strip()
 
 correct_text = []
+ff = open('output.txt', 'w')
 with open('input.txt', 'r') as f:    
     i = 1
     for ln in f.readlines():
@@ -50,10 +51,6 @@ with open('input.txt', 'r') as f:
         data = ln.strip()
         result = fix_text(data)
         correct_text += [result]
+        ff.write(result + '\n')
         i += 1
-
-with open('output.txt', 'w') as f:
-    for item in correct_text:
-        f.write(item)
-        f.write('\n')
 

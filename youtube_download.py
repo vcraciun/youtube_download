@@ -227,7 +227,7 @@ class YouTubeDownloader:
         procs = []        
         self.pb['value'] = 0            
         x = multiprocessing.Manager().list([[]]*len(chunks))
-        lang = "ro-RO" if self.language.get() == 1 else "en-ENț
+        lang = "ro-RO" if self.language.get() == 1 else "en-EN"
         params = [(i, all_chunks[i], x, lang) for i in range(len(all_chunks))]                
         with multiprocessing.Pool() as p:
             p.map(ConversieAudio, params)
@@ -328,25 +328,28 @@ class YouTubeDownloader:
         self.logger.info(f"Cuurent iteration: ({i}:{words})")
         return x
     
-    def BinarySearch(self, min, max, lmin, lmax, sound):
+    def BinarySearch(self, min, max, lmin, lmax, cuvinte_1, cuvinte_n, sound):
         cuvinte3 = self.ComputeIteration((min+max)//2, sound)
         l3 = self.CountWords(cuvinte3)
         if lmax < l3 and l3 > lmin:
-            if max == min + 2:
+            if (min+max)//2 + 1 == max:
                 return cuvinte3
             else:
-                return self.BinarySearch((min+max)//2, max, l3, lmax, sound)
+                return self.BinarySearch((min+max)//2, max, l3, lmax, cuvinte3, cuvinte_n, sound)
         else:
             if lmax > l3:
                 self.logger.info(f'Eroare --> trebuie extins range-ul: {min}:{lmin}, {(min+max)//2}:{l3}, {max}:{lmax}')
             else:
                 if l3 > lmin:
-                    self.logger.info(f'Eroare --> check: {min}:{lmin}, {(min+max)//2}:{l3}, {max}:{lmax}')
-                else:
-                    if max == min + 2:
+                    if (min+max)//2 == min + 1:
                         return cuvinte3
                     else:
-                        return self.BinarySearch(min, (min+max)//2, lmin, l3, sound)
+                        return self.BinarySearch((min+max)//2, max, l3, lmax, cuvinte3, cuvinte_n, sound)
+                else:
+                    if (min+max)//2 == min + 1:
+                        return cuvinte_1
+                    else:
+                        return self.BinarySearch(min, (min+max)//2, lmin, l3, cuvinte_1, cuvinte3, sound)
         return []
     
     def FindSolutions(self, sound):
@@ -356,7 +359,7 @@ class YouTubeDownloader:
         self.best_config={}
         cuvinte_1 = self.ComputeIteration(self.min_tresh, sound)        
         cuvinte_n = self.ComputeIteration(self.max_tresh, sound)
-        self.BinarySearch(self.min_tresh, self.max_tresh, self.CountWords(cuvinte_1), self.CountWords(cuvinte_n), sound)
+        self.BinarySearch(self.min_tresh, self.max_tresh, self.CountWords(cuvinte_1), self.CountWords(cuvinte_n), cuvinte_1, cuvinte_n, sound)
         solutii_sortat = dict(reversed(sorted(self.best_config.items())))
         return solutii_sortat
     
@@ -439,7 +442,7 @@ class YouTubeDownloader:
         i = 0   
         for video in playlist.videos:
             try:
-                self.DownloadSingleYouTubeObject(video, fis_type, video.url)         
+                self.DownloadSingleYouTubeObject(video, fis_type, video.watch_url)         
             except Exception as error:
                 self.statusvar.set(f"Eroare: [{error}]")
 
