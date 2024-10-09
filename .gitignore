@@ -162,3 +162,4 @@ audio-chunks
 *.json
 ffmpeg.exe
 ffprobe.exe
+*.mp3
