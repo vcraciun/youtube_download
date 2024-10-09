@@ -163,3 +163,4 @@ audio-chunks
 ffmpeg.exe
 ffprobe.exe
 *.mp3
+ffplay.exe
