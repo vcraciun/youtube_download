@@ -1,8 +1,8 @@
 import speech_recognition as sr
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
-from pytube import YouTube
-from pytube import Playlist
+from pytubefix import YouTube
+from pytubefix import Playlist
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import json
+import logging
 
 def RemoveSpecialChars(text):
     text = text.capitalize() + ".\n"
@@ -33,12 +34,14 @@ def RemoveSpecialChars(text):
     return text
 
 def ConversieAudio(param):    
-    i, chunk, x = param
+    i, chunk, x, lang = param
     r = sr.Recognizer()
     with sr.AudioFile(chunk) as source:
         audio_listened = r.record(source)
         try:
-            text = r.recognize_google(audio_listened, language = "ro-RO")                
+            #text = r.recognize_google(audio_listened, language = "ro-RO")                
+            #text = r.recognize_google(audio_listened, language = "en-EN")
+            text = r.recognize_google(audio_listened, language = lang)
         except:            
             x[i] = ""
         else:
@@ -48,13 +51,14 @@ def ConversieAudio(param):
 
 class YouTubeDownloader:
     def __init__(self):
+        self.logger = logging.getLogger(__name__)
         self.max_file_size = 0
         self.window = Tk()
-        self.window.geometry('640x600')
+        self.window.geometry('640x640')
         self.window.title('Python Youtube Downloader')
         self.window.resizable(False,False)
         self.min_tresh = 15
-        self.max_tresh = 50
+        self.max_tresh = 60
 
         self.window.grid_columnconfigure(0, weight=1)
         self.window.grid_columnconfigure(1, weight=5)
@@ -68,6 +72,8 @@ class YouTubeDownloader:
         self.window.grid_rowconfigure(6, weight=1)
         self.window.grid_rowconfigure(7, weight=1)
         self.window.grid_rowconfigure(8, weight=1)
+        self.window.grid_rowconfigure(9, weight=1)
+        self.window.grid_rowconfigure(10, weight=1)
 
         self.AddComponents()
 
@@ -105,26 +111,36 @@ class YouTubeDownloader:
         self.audio_file = Entry(self.window, width = 80)
         self.audio_file.grid(column=1, row=2)
         Button(self.window, text='Cauta', command=self.f_add_t).grid(column=2, row=2)
+        
+        Label(self.window, text='Folder audio: ').grid(column=0, row=3)
+        self.audio_folder = Entry(self.window, width = 80)
+        self.audio_folder.grid(column=1, row=3)
+        Button(self.window, text='Transforma', command=self.d_add_t).grid(column=2, row=3)        
 
         self.file_type = IntVar()
         self.file_type.set(1)
-        Radiobutton(self.window, text="MP4", variable=self.file_type, value=1).grid(column=0, row=3, columnspan=1)
-        Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=3, columnspan=1)
-        Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=3, columnspan=1)
+        Radiobutton(self.window, text="MP4", variable=self.file_type, value=1).grid(column=0, row=4, columnspan=1)
+        Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=4, columnspan=1)
+        Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=4, columnspan=1)
 
-        Label(self.window, text='List de fisiere:').grid(column=0, row=4)
+        self.language = IntVar()
+        self.language.set(1)
+        Radiobutton(self.window, text="RO", variable=self.language, value=1).grid(column=0, row=5, columnspan=1)
+        Radiobutton(self.window, text="EN", variable=self.language, value=2).grid(column=2, row=5, columnspan=1)
+
+        Label(self.window, text='List de fisiere:').grid(column=0, row=6)
 
         self.scrollbar = Scrollbar(self.window, orient="vertical")
-        self.scrollbar.grid( column=6, row = 5, sticky=NS )
+        self.scrollbar.grid( column=6, row = 7, sticky=NS )
 
         self.lst = Listbox(self.window, width = 100, height=20, yscrollcommand=self.scrollbar.set)
-        self.lst.grid(column=0, row=5, columnspan = 7)
+        self.lst.grid(column=0, row=7, columnspan = 8)
 
         self.pb = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb.grid(column=0, row=6, columnspan=7)
+        self.pb.grid(column=0, row=8, columnspan=8)
 
         self.pb2 = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb2.grid(column=0, row=7, columnspan=7)
+        self.pb2.grid(column=0, row=9, columnspan=8)
 
         self.pb['value'] = 0
         self.pb2['value'] = 0
@@ -132,20 +148,38 @@ class YouTubeDownloader:
         self.statusvar = StringVar()
         self.statusvar.set("Pregatit")
         self.sbar = Label(self.window, textvariable=self.statusvar, relief=FLAT, anchor="w", justify="left", width=85)
-        self.sbar.grid(column=0, row=8, columnspan=7)
+        self.sbar.grid(column=0, row=10, columnspan=7)
 
         self.menu_1 = Menu(tearoff=False)
         self.menu_2 = Menu(tearoff=False)
-        self.menu_1.add_command(label="Copie", command=self.menu_1_copy)
-        self.menu_1.add_command(label="Taie", command=self.menu_1_cut)
+        self.menu_3 = Menu(tearoff=False)
+        self.menu_4 = Menu(tearoff=False)
+        
+        self.menu_1.add_command(label="Copie", command=self.menu_copy_1)
+        self.menu_1.add_command(label="Taie", command=self.menu_cut_1)
         self.menu_1.add_separator()
-        self.menu_1.add_command(label="Lipeste", command=self.menu_1_paste)
-        self.menu_2.add_command(label="Copie", command=self.menu_2_copy)
-        self.menu_2.add_command(label="Taie", command=self.menu_2_cut)
+        self.menu_1.add_command(label="Lipeste", command=self.menu_paste_1)
+        
+        self.menu_2.add_command(label="Copie", command=self.menu_copy_2)
+        self.menu_2.add_command(label="Taie", command=self.menu_cut_2)
         self.menu_2.add_separator()
-        self.menu_2.add_command(label="Lipeste", command=self.menu_2_paste)
+        self.menu_2.add_command(label="Lipeste", command=self.menu_paste_2)
+
+        self.menu_3.add_command(label="Copie", command=self.menu_copy_3)
+        self.menu_3.add_command(label="Taie", command=self.menu_cut_3)
+        self.menu_3.add_separator()
+        self.menu_3.add_command(label="Lipeste", command=self.menu_paste_3)        
+
+        self.menu_4.add_command(label="Copie", command=self.menu_copy_4)
+        self.menu_4.add_command(label="Taie", command=self.menu_cut_4)
+        self.menu_4.add_separator()
+        self.menu_4.add_command(label="Lipeste", command=self.menu_paste_4)        
+        
         self.url_single.bind('<Button-3>', self.display_popup_1)
-        self.url_playlist.bind('<Button-3>', self.display_popup_2)        
+        self.url_playlist.bind('<Button-3>', self.display_popup_2)  
+        self.audio_file.bind('<Button-3>', self.display_popup_3)  
+        self.audio_folder.bind('<Button-3>', self.display_popup_4)  
+        
 
     def show_progress_bar(self, stream=None, chunk=None, bytes_remaining=None):
         if self.max_file_size == 0:
@@ -189,16 +223,12 @@ class YouTubeDownloader:
         self.statusvar.set(f"Sparg fisierul mare in bucati mai mici: [{len(chunks)}/{len(chunks)}] : {100}%")
         return all_chunks
     
-    def ConvertChunksToText(self, chunks, all_chunks, i, n, words, best):
+    def ConvertChunksToText(self, chunks, all_chunks):
         procs = []        
         self.pb['value'] = 0            
         x = multiprocessing.Manager().list([[]]*len(chunks))
-        params = [(i, all_chunks[i], x) for i in range(len(all_chunks))]                
-        #threading.Thread(target=self.update_progress, args=(x, len(chunks), )).start()
-        if i == 0:
-            self.statusvar.set(f'Conversie AUDIO la TEXT: Incercam varianta [{i}/{n}]')
-        else:
-            self.statusvar.set(f'Conversie AUDIO la TEXT: Incercam varianta [{i}/{n}], Varianta {i-1} -> [{words}] cuvinte, Best: ({best[0]}:{best[1]})')
+        lang = "ro-RO" if self.language.get() == 1 else "en-EN"
+        params = [(i, all_chunks[i], x, lang) for i in range(len(all_chunks))]                
         with multiprocessing.Pool() as p:
             p.map(ConversieAudio, params)
         return x
@@ -284,30 +314,53 @@ class YouTubeDownloader:
             words += len(item.split(' '))    
         return words
     
+    def ComputeIteration(self, i, sound):
+        tresh = i * (-1)
+        self.ClearChunksFolder('audio-chunks')
+        chunks = split_on_silence(sound, min_silence_len=1000, silence_thresh=tresh, keep_silence=700, seek_step=100)        
+        all_chunks = self.SplitToChunks(chunks, folder_name="audio-chunks")             
+        x = self.ConvertChunksToText(chunks, all_chunks)
+        self.statusvar.set(f'Conversie AUDIO la TEXT: S-a terminat varianta [{i}] -> {len(x)} cuvinte')
+        if len(x) == 0:
+            return []
+        words = self.CountWords(x)
+        self.best_config[words] = (i, x)
+        self.logger.info(f"Cuurent iteration: ({i}:{words})")
+        return x
+    
+    def BinarySearch(self, min, max, lmin, lmax, cuvinte_1, cuvinte_n, sound):
+        cuvinte3 = self.ComputeIteration((min+max)//2, sound)
+        l3 = self.CountWords(cuvinte3)
+        if lmax < l3 and l3 > lmin:
+            if (min+max)//2 + 1 == max:
+                return cuvinte3
+            else:
+                return self.BinarySearch((min+max)//2, max, l3, lmax, cuvinte3, cuvinte_n, sound)
+        else:
+            if lmax > l3:
+                self.logger.info(f'Eroare --> trebuie extins range-ul: {min}:{lmin}, {(min+max)//2}:{l3}, {max}:{lmax}')
+            else:
+                if l3 > lmin:
+                    if (min+max)//2 == min + 1:
+                        return cuvinte3
+                    else:
+                        return self.BinarySearch((min+max)//2, max, l3, lmax, cuvinte3, cuvinte_n, sound)
+                else:
+                    if (min+max)//2 == min + 1:
+                        return cuvinte_1
+                    else:
+                        return self.BinarySearch(min, (min+max)//2, lmin, l3, cuvinte_1, cuvinte3, sound)
+        return []
+    
     def FindSolutions(self, sound):
         self.statusvar.set('Caut solutia cea mai buna de conversie, s-ar putea sa dureze cateva minute ... ')
-        best_config = {}
-        self.pb['value'] = 0
-        pb_increment = 100 / len(list(range(self.min_tresh,self.max_tresh)))
-        words = 0
-        best = (0, 0)
-        max = 0
-        self.pb2['value'] = 0
-        for i in range(self.min_tresh,self.max_tresh):
-            tresh = i * (-1)
-            self.ClearChunksFolder('audio-chunks')
-            chunks = split_on_silence(sound, min_silence_len=1000, silence_thresh=tresh, keep_silence=700, seek_step=100)        
-            all_chunks = self.SplitToChunks(chunks, folder_name="audio-chunks")             
-            x = self.ConvertChunksToText(chunks, all_chunks, i-15, len(list(range(self.min_tresh,self.max_tresh))), words, best)
-            if len(x) == 0:
-                continue    
-            words = self.CountWords(x)
-            best_config[words] = (i, x)    
-            self.pb2['value'] += pb_increment
-            solutii_sortat = dict(reversed(sorted(best_config.items())))
-            if words > max:
-                best = (i, words)
-                max = words
+        self.pb['value'] = 0      
+        self.pb2['value'] = 0              
+        self.best_config={}
+        cuvinte_1 = self.ComputeIteration(self.min_tresh, sound)        
+        cuvinte_n = self.ComputeIteration(self.max_tresh, sound)
+        self.BinarySearch(self.min_tresh, self.max_tresh, self.CountWords(cuvinte_1), self.CountWords(cuvinte_n), cuvinte_1, cuvinte_n, sound)
+        solutii_sortat = dict(reversed(sorted(self.best_config.items())))
         return solutii_sortat
     
     def ScrieTextRezultat(self, solutie, output_txt):
@@ -338,19 +391,15 @@ class YouTubeDownloader:
         else:
             self.ScrieStatistica(solutie, url)
         
-    def file_add(self):
-        start = time.time()
-        fname = filedialog.askopenfilename(initialdir = "./", title = "Selectati fisier Audio", filetypes = (("Fisiere MP3", "*.mp3*"), ("Fisiere WAV", "*.wav"), ("Toate fisierele", "*.*")))
-        self.audio_file.delete(0, END)
-        self.audio_file.insert(0, fname)
+    def mp3_process(self, fname):        
         fis_type = self.file_type.get()
         if fis_type != 3:
             self.statusvar.set(f"EROARE: TRebuie sa bifati optiunea TXT pentru conversie!")
-            return
-        fname = self.audio_file.get()        
+            return        
         if len(fname) == 0:
             self.statusvar.set("EROARE: Numele de fisier lipseste!")
             return        
+        start = time.time()
         self.lst.insert(self.lst.size(), fname)
         self.TransformMP3ToText(fname, "")    
         self.EraseChunksFolder('audio-chunks')
@@ -359,7 +408,20 @@ class YouTubeDownloader:
         self.statusvar.set(f"Gata! Conversia a durat {timp_total//60} minute si {timp_total%60} secunde")
         self.pb['value'] = 0
         self.window.update()
-        self.window.update_idletasks()        
+        self.window.update_idletasks() 
+        
+        
+    def file_add(self):        
+        fname = filedialog.askopenfilename(initialdir = "./", title = "Selectati fisier Audio", filetypes = (("Fisiere MP3", "*.mp3*"), ("Fisiere WAV", "*.wav"), ("Toate fisierele", "*.*")))
+        self.audio_file.delete(0, END)
+        self.audio_file.insert(0, fname)
+        self.mp3_process(fname)
+
+    def folder_add(self):
+        folder = self.audio_folder.get()
+        file_list = [f for f in os.listdir(folder) if f.endswith('.mp3')]
+        for mp3 in file_list:
+            self.mp3_process(f"{folder}\\{mp3}")
 
     def single_add(self):
         fis_type = self.file_type.get()
@@ -380,7 +442,7 @@ class YouTubeDownloader:
         i = 0   
         for video in playlist.videos:
             try:
-                self.DownloadSingleYouTubeObject(video, fis_type, video.url)         
+                self.DownloadSingleYouTubeObject(video, fis_type, video.watch_url)         
             except Exception as error:
                 self.statusvar.set(f"Eroare: [{error}]")
 
@@ -392,35 +454,49 @@ class YouTubeDownloader:
 
     def f_add_t(self):
         threading.Thread(target=self.file_add).start()
+        
+    def d_add_t(self):
+        threading.Thread(target=self.folder_add).start()
       
     def display_popup_1(self, event):
         self.menu_1.post(event.x_root, event.y_root)
-
     def display_popup_2(self, event):
         self.menu_2.post(event.x_root, event.y_root)
+    def display_popup_3(self, event):
+        self.menu_3.post(event.x_root, event.y_root)
+    def display_popup_4(self, event):
+        self.menu_4.post(event.x_root, event.y_root)        
         
-    def menu_1_copy(self):
+    def menu_copy_1(self):
         self.url_single.event_generate("<<Copy>>")
-
-    def menu_1_cut(self):
+    def menu_cut_1(self):
         self.url_single.event_generate("<<Cut>>")
-
-    def menu_1_paste(self):
+    def menu_paste_1(self):
         self.url_single.event_generate("<<Paste>>")
-
-    def menu_2_copy(self):
-        self.url_playlist.event_generate("<<Copy>>")
-
-    def menu_2_cut(self):
-        self.url_playlist.event_generate("<<Cut>>")
-
-    def menu_2_paste(self):
-        self.url_playlist.event_generate("<<Paste>>")
+    def menu_copy_2(self):
+        self.url_playlis.event_generate("<<Copy>>")
+    def menu_cut_2(self):
+        self.url_playlis.event_generate("<<Cut>>")
+    def menu_paste_2(self):
+        self.url_playlis.event_generate("<<Paste>>")
+    def menu_copy_3(self):
+        self.audio_file.event_generate("<<Copy>>")
+    def menu_cut_3(self):
+        self.audio_file.event_generate("<<Cut>>")
+    def menu_paste_3(self):
+        self.audio_file.event_generate("<<Paste>>")
+    def menu_copy_4(self):
+        self.audio_folder.event_generate("<<Copy>>")
+    def menu_cut_4(self):
+        self.audio_folder.event_generate("<<Cut>>")
+    def menu_paste_4(self):
+        self.audio_folder.event_generate("<<Paste>>")        
 
     def Run(self):
         self.window.mainloop()
 
 def main():
+    logging.basicConfig(filename='Youtube-Downloader.log', level=logging.INFO)    
     downloader = YouTubeDownloader()    
     downloader.Run()
 
