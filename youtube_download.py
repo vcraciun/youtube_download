@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import json
+import re
 import logging
 
 def RemoveSpecialChars(text):
@@ -54,7 +55,7 @@ class YouTubeDownloader:
         self.logger = logging.getLogger(__name__)
         self.max_file_size = 0
         self.window = Tk()
-        self.window.geometry('640x640')
+        self.window.geometry('640x680')
         self.window.title('Python Youtube Downloader')
         self.window.resizable(False,False)
         self.min_tresh = 15
@@ -74,6 +75,7 @@ class YouTubeDownloader:
         self.window.grid_rowconfigure(8, weight=1)
         self.window.grid_rowconfigure(9, weight=1)
         self.window.grid_rowconfigure(10, weight=1)
+        self.window.grid_rowconfigure(11, weight=1)
 
         self.AddComponents()
 
@@ -112,35 +114,40 @@ class YouTubeDownloader:
         self.audio_file.grid(column=1, row=2)
         Button(self.window, text='Cauta', command=self.f_add_t).grid(column=2, row=2)
         
-        Label(self.window, text='Folder audio: ').grid(column=0, row=3)
+        Label(self.window, text='Fisier linkuri: ').grid(column=0, row=3)
+        self.links_file = Entry(self.window, width = 80)
+        self.links_file.grid(column=1, row=3)
+        Button(self.window, text='Descarca Tot', command=self.lf_add_t).grid(column=2, row=3)
+
+        Label(self.window, text='Folder audio: ').grid(column=0, row=4)
         self.audio_folder = Entry(self.window, width = 80)
-        self.audio_folder.grid(column=1, row=3)
-        Button(self.window, text='Transforma', command=self.d_add_t).grid(column=2, row=3)        
+        self.audio_folder.grid(column=1, row=4)
+        Button(self.window, text='Transforma', command=self.d_add_t).grid(column=2, row=4)
 
         self.file_type = IntVar()
         self.file_type.set(1)
-        Radiobutton(self.window, text="MP4", variable=self.file_type, value=1).grid(column=0, row=4, columnspan=1)
-        Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=4, columnspan=1)
-        Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=4, columnspan=1)
+        Radiobutton(self.window, text="MP4", variable=self.file_type, value=1).grid(column=0, row=5, columnspan=1)
+        Radiobutton(self.window, text="MP3", variable=self.file_type, value=2).grid(column=1, row=5, columnspan=1)
+        Radiobutton(self.window, text="TXT", variable=self.file_type, value=3).grid(column=2, row=5, columnspan=1)
 
         self.language = IntVar()
         self.language.set(1)
-        Radiobutton(self.window, text="RO", variable=self.language, value=1).grid(column=0, row=5, columnspan=1)
-        Radiobutton(self.window, text="EN", variable=self.language, value=2).grid(column=2, row=5, columnspan=1)
+        Radiobutton(self.window, text="RO", variable=self.language, value=1).grid(column=0, row=6, columnspan=1)
+        Radiobutton(self.window, text="EN", variable=self.language, value=2).grid(column=2, row=6, columnspan=1)
 
-        Label(self.window, text='List de fisiere:').grid(column=0, row=6)
+        Label(self.window, text='List de fisiere:').grid(column=0, row=7)
 
         self.scrollbar = Scrollbar(self.window, orient="vertical")
-        self.scrollbar.grid( column=6, row = 7, sticky=NS )
+        self.scrollbar.grid( column=6, row = 8, sticky=NS )
 
         self.lst = Listbox(self.window, width = 100, height=20, yscrollcommand=self.scrollbar.set)
-        self.lst.grid(column=0, row=7, columnspan = 8)
+        self.lst.grid(column=0, row=8, columnspan = 8)
 
         self.pb = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb.grid(column=0, row=8, columnspan=8)
+        self.pb.grid(column=0, row=9, columnspan=8)
 
         self.pb2 = ttk.Progressbar(self.window, orient = 'horizontal', mode = 'determinate', length=600)
-        self.pb2.grid(column=0, row=9, columnspan=8)
+        self.pb2.grid(column=0, row=10, columnspan=8)
 
         self.pb['value'] = 0
         self.pb2['value'] = 0
@@ -148,7 +155,7 @@ class YouTubeDownloader:
         self.statusvar = StringVar()
         self.statusvar.set("Pregatit")
         self.sbar = Label(self.window, textvariable=self.statusvar, relief=FLAT, anchor="w", justify="left", width=85)
-        self.sbar.grid(column=0, row=10, columnspan=7)
+        self.sbar.grid(column=0, row=11, columnspan=7)
 
         self.menu_1 = Menu(tearoff=False)
         self.menu_2 = Menu(tearoff=False)
@@ -173,11 +180,18 @@ class YouTubeDownloader:
         self.menu_4.add_command(label="Copie", command=self.menu_copy_4)
         self.menu_4.add_command(label="Taie", command=self.menu_cut_4)
         self.menu_4.add_separator()
-        self.menu_4.add_command(label="Lipeste", command=self.menu_paste_4)        
-        
+        self.menu_4.add_command(label="Lipeste", command=self.menu_paste_4)
+
+        self.menu_5 = Menu(tearoff=False)
+        self.menu_5.add_command(label="Copie", command=self.menu_copy_5)
+        self.menu_5.add_command(label="Taie", command=self.menu_cut_5)
+        self.menu_5.add_separator()
+        self.menu_5.add_command(label="Lipeste", command=self.menu_paste_5)
+
         self.url_single.bind('<Button-3>', self.display_popup_1)
-        self.url_playlist.bind('<Button-3>', self.display_popup_2)  
-        self.audio_file.bind('<Button-3>', self.display_popup_3)  
+        self.url_playlist.bind('<Button-3>', self.display_popup_2)
+        self.links_file.bind('<Button-3>', self.display_popup_5)
+        self.audio_file.bind('<Button-3>', self.display_popup_3)
         self.audio_folder.bind('<Button-3>', self.display_popup_4)  
         
 
@@ -446,6 +460,120 @@ class YouTubeDownloader:
             except Exception as error:
                 self.statusvar.set(f"Eroare: [{error}]")
 
+    def sanitize_filename(self, name):
+        """Remove characters that are invalid in folder/file names."""
+        name = re.sub(r'[<>:"/\\|?*]', '', name)
+        name = name.strip('. ')
+        return name if name else 'unknown'
+
+    def is_playlist_url(self, url):
+        return 'list=' in url
+
+    def download_from_links_file(self):
+        filepath = self.links_file.get().strip()
+        if not filepath:
+            filepath = filedialog.askopenfilename(
+                initialdir="./", title="Selectati fisier cu linkuri",
+                filetypes=(("Fisiere Text", "*.txt"), ("Toate fisierele", "*.*")))
+            if not filepath:
+                return
+            self.links_file.delete(0, END)
+            self.links_file.insert(0, filepath)
+
+        if not os.path.isfile(filepath):
+            self.statusvar.set(f"Eroare: Fisierul nu exista: {filepath}")
+            return
+
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        urls = [line.strip() for line in lines if line.strip() and not line.strip().startswith('#')]
+        if not urls:
+            self.statusvar.set("Eroare: Fisierul nu contine linkuri!")
+            return
+
+        downloads_dir = os.path.join(os.path.dirname(filepath), 'downloads')
+        os.makedirs(downloads_dir, exist_ok=True)
+
+        fis_type = self.file_type.get()
+        total = len(urls)
+
+        for idx, url in enumerate(urls):
+            self.statusvar.set(f"Procesez [{idx+1}/{total}]: {url[:60]}...")
+            self.pb2['value'] = (idx / total) * 100
+            try:
+                if self.is_playlist_url(url):
+                    playlist = Playlist(url)
+                    playlist_name = self.sanitize_filename(playlist.title)
+                    playlist_dir = os.path.join(downloads_dir, playlist_name)
+                    os.makedirs(playlist_dir, exist_ok=True)
+                    self.lst.insert(self.lst.size(), f"[PLAYLIST] {playlist_name} ({len(playlist.videos)} video)")
+                    for vi, video in enumerate(playlist.videos):
+                        self.statusvar.set(f"Playlist [{idx+1}/{total}] - Video [{vi+1}/{len(playlist.videos)}]: {video.title[:50]}...")
+                        try:
+                            self.download_video_to_folder(video, fis_type, playlist_dir)
+                        except Exception as error:
+                            self.lst.insert(self.lst.size(), f"  [EROARE] {error}")
+                            self.logger.error(f"Error downloading {video.watch_url}: {error}")
+                else:
+                    video = YouTube(url)
+                    self.download_video_to_folder(video, fis_type, downloads_dir)
+            except Exception as error:
+                self.lst.insert(self.lst.size(), f"[EROARE] {url}: {error}")
+                self.logger.error(f"Error processing {url}: {error}")
+
+        self.pb2['value'] = 100
+        self.statusvar.set(f"Gata! S-au procesat {total} linkuri.")
+
+    def download_video_to_folder(self, youtubeObject, fis_type, output_dir):
+        """Download a single video to a specific output directory."""
+        youtubeObject.register_on_progress_callback(self.show_progress_bar)
+        streams = youtubeObject.streams
+        stream = streams.get_highest_resolution()
+        self.max_file_size = stream.filesize
+
+        title = youtubeObject.title
+        safe_title = self.sanitize_filename(title)
+        if len(safe_title) > 100:
+            safe_title = safe_title[:100]
+
+        timp = youtubeObject.length
+        hh, mm, ss = str(timp // 3600), str((timp % 3600) // 60), str(timp % 60)
+        display_title = f"{hh}:{mm}:{ss} --> {title[:80]}"
+
+        if fis_type == 1:
+            ext = '.mp4'
+            item = f"[MP4] : [{display_title}]"
+        elif fis_type == 2:
+            ext = '.mp3'
+            item = f"[MP3] : [{display_title}]"
+        else:
+            ext = '.mp4'
+            item = f"[TXT] : [{display_title}]"
+        self.lst.insert(self.lst.size(), item)
+
+        self.pb['value'] = 0
+        self.statusvar.set(f'Descarc: {title[:60]}...')
+        stream.download(output_path=output_dir)
+
+        downloaded_file = os.path.join(output_dir, stream.default_filename)
+
+        if fis_type == 2:
+            output_mp3 = os.path.join(output_dir, safe_title + '.mp3')
+            self.ConvertToMP3(downloaded_file, output_mp3)
+        elif fis_type == 3:
+            pre = os.path.join(output_dir, safe_title)
+            output_mp3 = pre + '.mp3'
+            self.ConvertToMP3(downloaded_file, output_mp3)
+            self.PrepareFolder("audio-chunks")
+            self.TransformMP3ToText(output_mp3, youtubeObject.watch_url)
+            self.EraseChunksFolder('audio-chunks')
+
+        self.pb['value'] = 0
+
+    def lf_add_t(self):
+        threading.Thread(target=self.download_from_links_file).start()
+
     def p_add_t(self):
         threading.Thread(target=self.playlist_add).start()
 
@@ -490,7 +618,15 @@ class YouTubeDownloader:
     def menu_cut_4(self):
         self.audio_folder.event_generate("<<Cut>>")
     def menu_paste_4(self):
-        self.audio_folder.event_generate("<<Paste>>")        
+        self.audio_folder.event_generate("<<Paste>>")
+    def display_popup_5(self, event):
+        self.menu_5.post(event.x_root, event.y_root)
+    def menu_copy_5(self):
+        self.links_file.event_generate("<<Copy>>")
+    def menu_cut_5(self):
+        self.links_file.event_generate("<<Cut>>")
+    def menu_paste_5(self):
+        self.links_file.event_generate("<<Paste>>")
 
     def Run(self):
         self.window.mainloop()
